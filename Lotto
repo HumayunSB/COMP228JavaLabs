@@ -1,0 +1,127 @@
+package application;
+
+   import javafx.application.Application;
+   import javafx.scene.Scene;
+   import javafx.scene.control.Button;
+   import javafx.scene.control.Label;
+   import javafx.scene.control.TextField;
+   import javafx.scene.layout.HBox;
+   import javafx.scene.layout.VBox;
+   import javafx.stage.Stage;
+
+   import java.security.SecureRandom;
+   import java.sql.Connection;
+   import java.sql.DriverManager;
+   import java.sql.PreparedStatement;
+   import java.util.HashSet;
+   import java.util.Set;
+   import java.util.Stack;
+   import java.util.concurrent.ExecutorService;
+   import java.util.concurrent.Executors;
+
+   public class Lotto extends Application {
+          
+       private static final String DB_URL = "jdbc:mysql://localhost:3306/lotto_db";
+       private static final String USERNAME = "root"; //  DB username
+       private static final String PASSWORD = "rootHB"; // DB password
+
+       private final SecureRandom secureRandom = new SecureRandom();
+       private final ExecutorService executorService = Executors.newFixedThreadPool(5);
+       private final Stack<Set<Integer>> numbersStack = new Stack<>();
+
+       public static void main(String[] args) {
+           launch(args);
+       }
+
+       @Override
+       public void start(Stage primaryStage) {
+           TextField minField = new TextField("0");
+           minField.setPrefWidth(50);  // Set width to half
+           TextField maxField = new TextField("100");
+           maxField.setPrefWidth(50);  // Set width to half
+           TextField quantityField = new TextField("6");
+           quantityField.setPrefWidth(50);  // Set width to half
+           Label resultLabel = new Label("Your lotto numbers will appear here.");
+           Button generateButton = new Button("Generate Lotto Numbers");
+
+           // Create increase/decrease buttons for minField
+           Button minIncreaseButton = new Button("+");
+           Button minDecreaseButton = new Button("-");
+           minIncreaseButton.setOnAction(e -> adjustValue(minField, 1));
+           minDecreaseButton.setOnAction(e -> adjustValue(minField, -1));
+
+           // Create increase/decrease buttons for maxField
+           Button maxIncreaseButton = new Button("+");
+           Button maxDecreaseButton = new Button("-");
+           maxIncreaseButton.setOnAction(e -> adjustValue(maxField, 1));
+           maxDecreaseButton.setOnAction(e -> adjustValue(maxField, -1));
+
+           // Create increase/decrease buttons for quantityField
+           Button qtyIncreaseButton = new Button("+");
+           Button qtyDecreaseButton = new Button("-");
+           qtyIncreaseButton.setOnAction(e -> adjustValue(quantityField, 1));
+           qtyDecreaseButton.setOnAction(e -> adjustValue(quantityField, -1));
+
+           // Set up HBoxes for layout
+           HBox minBox = new HBox(5, minField, minDecreaseButton, minIncreaseButton);
+           HBox maxBox = new HBox(5, maxField, maxDecreaseButton, maxIncreaseButton);
+           HBox qtyBox = new HBox(5, quantityField, qtyDecreaseButton, qtyIncreaseButton);
+
+           generateButton.setOnAction(e -> {
+               int min = Integer.parseInt(minField.getText());
+               int max = Integer.parseInt(maxField.getText());
+               int quantity = Integer.parseInt(quantityField.getText());
+
+               for (int i = 0; i < 5; i++) {
+                   executorService.submit(() -> {
+                       Set<Integer> lottoNumbers = generateUniqueNumbers(min, max, quantity);
+                       synchronized (numbersStack) {
+                           numbersStack.push(lottoNumbers); // Store in stack
+                       }
+                       String numbersString = lottoNumbers.toString();
+                       saveToDatabase(numbersString);
+                       javafx.application.Platform.runLater(() -> 
+                           resultLabel.setText("Your lotto numbers are: " + numbersString));
+                   });
+               }
+           });
+
+           VBox vbox = new VBox(10, 
+                   new Label("Minimum number:"), minBox,
+                   new Label("Maximum number:"), maxBox,
+                   new Label("Quantity of balls:"), qtyBox,
+                   generateButton, resultLabel);
+           Scene scene = new Scene(vbox, 400, 300);
+           primaryStage.setTitle("Quick Pick Lotto");
+           primaryStage.setScene(scene);
+           primaryStage.show();
+       }
+
+       private void adjustValue(TextField field, int delta) {
+           try {
+               int currentValue = Integer.parseInt(field.getText());
+               field.setText(String.valueOf(currentValue + delta));
+           } catch (NumberFormatException e) {
+               field.setText("0"); // Reset to 0 if input is invalid
+           }
+       }
+
+       private Set<Integer> generateUniqueNumbers(int min, int max, int quantity) {
+           Set<Integer> numbers = new HashSet<>();
+           while (numbers.size() < quantity) {
+               numbers.add(secureRandom.nextInt((max - min) + 1) + min);
+           }
+           return numbers;
+       }
+
+       private void saveToDatabase(String numbers) {
+           String query = "INSERT INTO lotto_results (numbers) VALUES (?)";
+           try (Connection connection = DriverManager.getConnection(DB_URL, USERNAME, PASSWORD);
+                PreparedStatement statement = connection.prepareStatement(query)) {
+               statement.setString(1, numbers);
+               statement.executeUpdate();
+           } catch (Exception e) {
+               e.printStackTrace();
+           }
+       }
+   }
