@@ -1,0 +1,62 @@
+package application;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+
+
+public class JdbcExampleClass {
+
+	public static void main(String[] args) {
+
+		String url = "jdbc:mysql://localhost:3306/jdbcexample";
+
+		String username = "root"; // username of mysql..
+		String password = "rootHB"; // db password..
+
+		String query = "Select * from Student";
+
+		// load and registering the driver
+		try {
+			Class.forName("com.mysql.cj.jdbc.Driver");
+		} catch (ClassNotFoundException e) {
+
+			System.out.println(e.getMessage());
+			System.out.println(e.hashCode());
+			System.out.println(e.toString());
+			e.printStackTrace();
+		}
+
+		// setup an a connection..
+		try {
+			Connection conn = DriverManager.getConnection(url, username, password);
+			// create a STATEMENT object for sql qry
+			Statement st = conn.createStatement();
+			// Execute the query
+			ResultSet rs = st.executeQuery(query);
+
+			// Process the results
+			while (rs.next()) {
+				String name = rs.getString("fullname"); // Retrieve name from db
+				System.out.println(name); // Print result on console
+			}
+
+			// Close the statement and connection
+			st.close();
+			conn.close();
+			System.out.println("Connection Closed....");
+
+		} catch (SQLException e) {
+			System.out.println(e.getMessage());
+			System.out.println(e.hashCode());
+			System.out.println(e.toString());
+			e.printStackTrace();
+		}
+		System.out.println("Connection has been done...successfully ");
+
+	}
+
+}
